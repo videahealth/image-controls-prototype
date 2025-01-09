@@ -186,9 +186,9 @@ export const ImageControlsV5 = ({image, name}) => {
                 </label>
                 <Slider
                     min={0}
-                    max={3}
+                    max={2}
                     value={contrast}
-                    step={0.1}
+                    step={0.01}
                     onChange=
                     {
                         (e) => {
