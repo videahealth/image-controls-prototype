@@ -2,7 +2,99 @@ import React, { useEffect, useRef, useState} from 'react';
 import { useOpenCv } from 'opencv-react';
 import Slider from '@mui/material/Slider';
 import Button from '@mui/material/Button';
+import { quantile } from 'd3-array';
 
+// My attempt at histogram scaling (incomplete)
+/*const createHistogram = (data, numBins, min, max) => {
+    const histogram = [];
+    const binSize = (max - min) / numBins;
+
+    for (let i = 0; i < numBins; i += 1) {
+        histogram.push([]);
+    }
+
+    for (let i = 0; i < data.length; i += 1) {
+        if (data[i] < min || data[i] > max || i % 4 === 0) {
+            continue;
+        }
+        const binNumber = Math.floor((data[i] - min) / binSize);
+        histogram[binNumber].push(data[i]);
+    }
+
+    return histogram;
+}
+
+const getHistogramBin = (histogram, ignoredHistogram) => {
+    const histogramSum = histogram.reduce((sum, bin) => sum + bin.reduce((sum, pixel) => sum + pixel, 0), 0);
+    const ignoredHistogramSum = histogramSum * ignoredHistogram;
+
+    let cumulativeSum = 0;
+
+    return histogram.findIndex(bin => {
+        cumulativeSum += bin.reduce((sum, pixel) => sum + pixel, 0);
+        return cumulativeSum >= ignoredHistogramSum;
+    });
+}
+
+const histogramScaling = (name, cv, ignoredIntensity = 0.02, ignoredHistogram = 0.005) => {
+    let src = cv.imread(name);
+    const data = src.data;
+    
+    const maxBit = 255;
+    const ignoreBelow = Math.round(maxBit * ignoredIntensity);
+    const ignoreAbove = Math.round(maxBit - ignoreBelow);
+    const histogram = createHistogram(data, ignoreAbove - ignoreBelow + 1, ignoreBelow, ignoreAbove);
+    
+    const lowerHistogramBin = getHistogramBin(histogram, ignoredHistogram);
+    const upperHistogramBin = getHistogramBin(histogram, 1 - ignoredHistogram);
+
+    const currentLowerIntensity = ignoreBelow + lowerHistogramBin;
+    const currentUpperIntensity = ignoreBelow + upperHistogramBin;
+
+    const targetLowerIntensity = 0;
+    const targetUpperIntensity = maxBit;
+
+    const scaleFactor = targetUpperIntensity / (currentUpperIntensity + (targetLowerIntensity - currentLowerIntensity));
+    
+
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = Math.min(Math.max(data[i] * scaleFactor, 0), maxBit);
+        data[i + 1] = Math.min(Math.max(data[i + 1] * scaleFactor, 0), maxBit);
+        data[i + 2] = Math.min(Math.max(data[i + 2] * scaleFactor, 0), maxBit);
+    }
+
+    cv.imshow(name, src);
+    src.delete();
+}*/
+
+const histogramClipping = (data, clipLimit) => {
+    const lowerClipLimit = quantile(data.filter((_, i) => i % 4 !== 0), clipLimit[0] * 0.01);
+    const upperClipLimit = quantile(data.filter((_, i) => i % 4 !== 0), clipLimit[1] * 0.01);
+
+    const clippedValue = (data) => {
+        if (data < lowerClipLimit) {
+            return lowerClipLimit;
+        }
+        if (data > upperClipLimit) {
+            return upperClipLimit;
+        }
+        return data;
+    }
+    
+    for (let i = 0; i < data.length; i += 4) {
+        data[i] = clippedValue(data[i]);
+        data[i + 1] = clippedValue(data[i + 1]);
+        data[i + 2] = clippedValue(data[i + 2]);
+    }
+}
+
+const getPreProcessing = (name, cv) => {
+    let src = cv.imread(name);
+    const data = src.data;
+    // histogramClipping(data, [0.01, 99.9]);
+    cv.imshow(name, src);
+    src.delete();
+}
 
 const getBrightnessContrast = (name, cv, alpha, beta) => {
     let src = cv.imread(name);
@@ -94,6 +186,7 @@ export const ImageControlsV5 = ({image, name}) => {
 
     const updateImage = () => {
         if (cv) {
+            getPreProcessing(name, cv);
             getBrightnessContrast(name, cv, contrast, brightness);
             getGamma(name, cv, gamma)
             getSharpening(name, cv, blur, sharpeningStrength) 
@@ -143,108 +236,103 @@ export const ImageControlsV5 = ({image, name}) => {
                     "alignItems": "center"
                 }}
             >
-            <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
-                <label>
-                    Gamma:
-                </label>
-                <Slider
-                    min={0}
-                    max={10}
-                    step={0.01}
-                    value={gamma}
-                    onChange=
-                    {
-                        (e) => {
-                            setGamma(e.target.value);
-                            handleUpdateImage();
+                <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
+                    <label>
+                        Gamma:
+                    </label>
+                    <Slider
+                        min={0}
+                        max={10}
+                        step={0.01}
+                        value={gamma}
+                        onChange=
+                        {
+                            (e) => {
+                                setGamma(e.target.value);
+                                handleUpdateImage();
+                            }
                         }
-                    }
-                    valueLabelDisplay="auto"
-                />
-            </div>
-            <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
-                <label>
-                    Brightness:
-                </label>
-                <Slider
-                    min={-100}
-                    max={100}
-                    value={brightness}
-                    onChange=
-                    {
-                        (e) => {
-                            setBrightness(e.target.value);
-                            handleUpdateImage();
-                        }
-                    }
-                    valueLabelDisplay="auto"
-                />
-            </div>
-            <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
-                <label>
-                    Contrast:
-                </label>
-                <Slider
-                    min={0}
-                    max={2}
-                    value={contrast}
-                    step={0.01}
-                    onChange=
-                    {
-                        (e) => {
-                            setContrast(e.target.value);
-                            handleUpdateImage();
-                        }
-                    }
-                    valueLabelDisplay="auto"
-                />
-            </div>
-            <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
-                <label>
-                    Blur:
-                </label>
-                <Slider
-                    min={1}
-                    max={20}
-                    value={blur}
-                    step={1}
-                    onChange=
-                    {
-                        (e) => {
-                            setBlur(e.target.value);
-                            handleUpdateImage();
-                        }
-                    }
-                    valueLabelDisplay="auto"
-                />
-            </div>
-            <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
-                <label>
-                    Sharpen Strength:
-                </label>
-                <Slider
-                    min={1}
-                    max={10}
-                    value={sharpeningStrength}
-                    step={0.01}
-                    onChange=
-                    {
-                        (e) => {
-                            setSharpeningStrength(e.target.value);
-                            handleUpdateImage();
-                        }
-                    }
-                    valueLabelDisplay="auto"
-                />
-            </div>
-            <div style={{"display":"flex", "gap":"1em"}}>
-                <Button variant="outlined" onClick={handleResetImage}>Reset Image</Button>
-            </div>
-            {/*
-                <div style={{"display":"flex", "gap":"1em"}}>
-                    <Button variant="outlined" onClick={handleUpdateImage}>Update Image</Button>
+                        valueLabelDisplay="auto"
+                    />
                 </div>
-            */}
+                <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
+                    <label>
+                        Brightness:
+                    </label>
+                    <Slider
+                        min={-100}
+                        max={100}
+                        value={brightness}
+                        onChange=
+                        {
+                            (e) => {
+                                setBrightness(e.target.value);
+                                handleUpdateImage();
+                            }
+                        }
+                        valueLabelDisplay="auto"
+                    />
+                </div>
+                <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
+                    <label>
+                        Contrast:
+                    </label>
+                    <Slider
+                        min={0}
+                        max={2}
+                        value={contrast}
+                        step={0.01}
+                        onChange=
+                        {
+                            (e) => {
+                                setContrast(e.target.value);
+                                handleUpdateImage();
+                            }
+                        }
+                        valueLabelDisplay="auto"
+                    />
+                </div>
+                <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
+                    <label>
+                        Sharpening Kernel Size:
+                    </label>
+                    <Slider
+                        min={1}
+                        max={20}
+                        value={blur}
+                        step={1}
+                        onChange=
+                        {
+                            (e) => {
+                                setBlur(e.target.value);
+                                handleUpdateImage();
+                            }
+                        }
+                        valueLabelDisplay="auto"
+                    />
+                </div>
+                <div style={{"display":"flex", "gap":"1em", "width": "20em"}}>
+                    <label>
+                        Sharpen Strength:
+                    </label>
+                    <Slider
+                        min={1}
+                        max={10}
+                        value={sharpeningStrength}
+                        step={0.01}
+                        onChange=
+                        {
+                            (e) => {
+                                setSharpeningStrength(e.target.value);
+                                handleUpdateImage();
+                            }
+                        }
+                        valueLabelDisplay="auto"
+                    />
+                </div>
+                <div style={{"display":"flex", "gap":"1em"}}>
+                    <Button variant="outlined" onClick={handleResetImage}>Reset Image</Button>
+                </div>
             </div>
             
             <canvas id={name} ref={canvasRef} width={"750"} height={"750"}/>
