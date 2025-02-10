@@ -6,6 +6,7 @@ import r31 from './images/r31.png';
 import r44 from './images/r44.png';
 import r45 from './images/r45.png';
 import r46 from './images/r46.png';
+import dexis from './images/Dexis.png';
 import { OpenCvProvider } from 'opencv-react';
 import { ImageControlsV5 } from './imageControls/ImageControlsV5';
 
@@ -27,6 +28,7 @@ function App() {
     >
       <h style={{"fontSize": "30px"}}>Image Controls Prototype</h>
       <OpenCvProvider>
+        <ImageControlsV5 image={dexis} name={"dexis example"}/>
   
         <ImageControlsV5 image={r4} name={"r4"}/>
       
