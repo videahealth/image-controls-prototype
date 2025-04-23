@@ -1,15 +1,44 @@
 import { quantile } from "d3-array";
 
+// TODO: Move scaleToUnity to own function to copy ML as closely as possible
+// TODO: Should we convert to grayscale before calculating percentiles?
+
+const scaleToUnity = (imageArray: Uint8ClampedArray): Uint8ClampedArray => {
+  // Find max value efficiently without using spread operator
+  let maxValue = 0;
+  for (let i = 0; i < imageArray.length; i++) {
+    if (imageArray[i] > maxValue) {
+      maxValue = imageArray[i];
+    }
+  }
+
+  // Handle case where maxValue is 0 to avoid division by zero
+  if (maxValue === 0) {
+    return imageArray;
+  }
+
+  // Create new array with scaled values
+  const scaledArray = new Uint8ClampedArray(imageArray.length);
+  for (let i = 0; i < imageArray.length; i++) {
+    scaledArray[i] = Math.round((imageArray[i] / maxValue) * 255);
+  }
+
+  return scaledArray;
+};
+
 export const executePercentileClipping = (
   imageArray: Uint8ClampedArray,
   parameters: { lowerBound: number; upperBound: number }
 ): Uint8ClampedArray => {
+  // First scale to unity
+  const scaledArray = scaleToUnity(imageArray);
+
   // Extract RGB channels (skip alpha channel) and normalize to 0-1 range
   const rgbChannels: number[] = [];
-  for (let i = 0; i < imageArray.length; i += 4) {
-    rgbChannels.push(imageArray[i] / 255); // R
-    rgbChannels.push(imageArray[i + 1] / 255); // G
-    rgbChannels.push(imageArray[i + 2] / 255); // B
+  for (let i = 0; i < scaledArray.length; i += 4) {
+    rgbChannels.push(scaledArray[i] / 255); // R
+    rgbChannels.push(scaledArray[i + 1] / 255); // G
+    rgbChannels.push(scaledArray[i + 2] / 255); // B
   }
 
   // Calculate quantiles on normalized RGB channels
@@ -17,38 +46,30 @@ export const executePercentileClipping = (
   const upperQuantile = quantile(rgbChannels, parameters.upperBound / 100);
 
   // Create a new array to store the clipped values
-  const clippedArray = new Uint8ClampedArray(imageArray.length);
+  const clippedArray = new Uint8ClampedArray(scaledArray.length);
 
   // Apply clipping to each channel while preserving alpha
-  for (let i = 0; i < imageArray.length; i += 4) {
+  for (let i = 0; i < scaledArray.length; i += 4) {
     // Normalize current pixel values
-    const r = imageArray[i] / 255;
-    const g = imageArray[i + 1] / 255;
-    const b = imageArray[i + 2] / 255;
+    const r = scaledArray[i] / 255;
+    const g = scaledArray[i + 1] / 255;
+    const b = scaledArray[i + 2] / 255;
 
     // Apply clipping in normalized space
     clippedArray[i] = Math.round(
       Math.min(Math.max(r, lowerQuantile), upperQuantile) * 255
     ); // R
-    if (i === 0) {
-      console.log({
-        r,
-        lowerQuantile,
-        upperQuantile,
-        clippedArray: clippedArray[i],
-      });
-    }
     clippedArray[i + 1] = Math.round(
       Math.min(Math.max(g, lowerQuantile), upperQuantile) * 255
     ); // G
     clippedArray[i + 2] = Math.round(
       Math.min(Math.max(b, lowerQuantile), upperQuantile) * 255
     ); // B
-    clippedArray[i + 3] = imageArray[i + 3]; // A
+    clippedArray[i + 3] = scaledArray[i + 3]; // A
   }
 
   // Log first 5 pixels (20 values) for comparison
-  const firstPixels = Array.from(imageArray.slice(0, 20));
+  const firstPixels = Array.from(scaledArray.slice(0, 20));
   const firstPixelsNormalized = firstPixels.map((v, i) =>
     i % 4 === 3 ? 1 : v / 255
   );
