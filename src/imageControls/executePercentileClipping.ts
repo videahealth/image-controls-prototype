@@ -1,40 +1,5 @@
 import { quantile } from "d3-array";
-
-const scaleToUnity = (imageArray: Uint8ClampedArray): Uint8ClampedArray => {
-  // Find max value efficiently without using spread operator
-  let maxValue = 0;
-  for (let i = 0; i < imageArray.length; i++) {
-    if (imageArray[i] > maxValue) {
-      maxValue = imageArray[i];
-    }
-  }
-
-  // Handle case where maxValue is 0 to avoid division by zero
-  if (maxValue === 0) {
-    return imageArray;
-  }
-
-  // Create new array with scaled values
-  const scaledArray = new Uint8ClampedArray(imageArray.length);
-  for (let i = 0; i < imageArray.length; i++) {
-    scaledArray[i] = Math.round((imageArray[i] / maxValue) * 255);
-  }
-
-  return scaledArray;
-};
-
-const convertToGrayscale = (imageArray: Uint8ClampedArray): number[] => {
-  const grayscale: number[] = [];
-  // Convert RGBA to grayscale using the standard formula: 0.299R + 0.587G + 0.114B
-  for (let i = 0; i < imageArray.length; i += 4) {
-    const r = imageArray[i];
-    const g = imageArray[i + 1];
-    const b = imageArray[i + 2];
-    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-    grayscale.push(gray);
-  }
-  return grayscale;
-};
+import { scaleToUnity, convertToGrayscale } from "./imageUtils.ts";
 
 export const executePercentileClipping = (
   imageArray: Uint8ClampedArray,
@@ -71,14 +36,11 @@ export const executePercentileClipping = (
     // Apply clipping in normalized space
     let clippedGray: number;
     if (normalizedGray < lowerQuantile) {
-      clippedGray = 0; // Clip to black
+      clippedGray = Math.round(lowerQuantile * 255); // Clip to lower percentile value
     } else if (normalizedGray > upperQuantile) {
-      clippedGray = 255; // Clip to white
+      clippedGray = Math.round(upperQuantile * 255); // Clip to upper percentile value
     } else {
-      // Scale the value between the percentiles to the full range
-      const range = upperQuantile - lowerQuantile;
-      const normalizedValue = (normalizedGray - lowerQuantile) / range;
-      clippedGray = Math.round(normalizedValue * 255);
+      clippedGray = grayscale[grayIndex]; // Keep original value
     }
 
     // Set RGB channels to the same clipped grayscale value
@@ -88,23 +50,64 @@ export const executePercentileClipping = (
     clippedArray[i + 3] = scaledArray[i + 3]; // A
   }
 
+  // Apply histogram stretching to the clipped values
+  const stretchedArray = new Uint8ClampedArray(imageArray.length);
+  const clippedGrayscale = convertToGrayscale(clippedArray);
+  const clippedNormalized = clippedGrayscale.map((v) => v / 255);
+
+  // Calculate new quantiles after clipping
+  const clippedLowerQuantile = quantile(
+    clippedNormalized,
+    parameters.lowerBound / 100
+  );
+  const clippedUpperQuantile = quantile(
+    clippedNormalized,
+    parameters.upperBound / 100
+  );
+
+  // Apply histogram stretching
+  for (let i = 0; i < imageArray.length; i += 4) {
+    const grayIndex = i / 4;
+    const normalizedGray = clippedNormalized[grayIndex];
+
+    // Stretch values between the clipped percentiles to the full range
+    let stretchedGray: number;
+    if (normalizedGray <= clippedLowerQuantile) {
+      stretchedGray = 0;
+    } else if (normalizedGray >= clippedUpperQuantile) {
+      stretchedGray = 255;
+    } else {
+      const range = clippedUpperQuantile - clippedLowerQuantile;
+      const normalizedValue = (normalizedGray - clippedLowerQuantile) / range;
+      stretchedGray = Math.round(normalizedValue * 255);
+    }
+
+    // Set RGB channels to the same stretched grayscale value
+    stretchedArray[i] = stretchedGray; // R
+    stretchedArray[i + 1] = stretchedGray; // G
+    stretchedArray[i + 2] = stretchedGray; // B
+    stretchedArray[i + 3] = clippedArray[i + 3]; // A
+  }
+
   // Log first 5 pixels (20 values) for comparison
   const firstPixels = Array.from(scaledArray.slice(0, 20));
   const firstPixelsNormalized = firstPixels.map((v, i) =>
     i % 4 === 3 ? 1 : v / 255
   );
-  const firstPixelsClipped = Array.from(clippedArray.slice(0, 20));
+  const firstPixelsStretched = Array.from(stretchedArray.slice(0, 20));
 
   console.log({
-    clippedArray: firstPixelsClipped,
-    clippedArrayLength: clippedArray.length,
+    stretchedArray: firstPixelsStretched,
+    stretchedArrayLength: stretchedArray.length,
     imageArray: firstPixels,
     lowerBound: parameters.lowerBound,
     lowerQuantile,
+    clippedLowerQuantile,
     normalizedArray: firstPixelsNormalized,
     upperBound: parameters.upperBound,
     upperQuantile,
+    clippedUpperQuantile,
   });
 
-  return clippedArray;
+  return stretchedArray;
 };
