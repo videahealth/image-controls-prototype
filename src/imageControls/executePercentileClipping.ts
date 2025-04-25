@@ -1,8 +1,5 @@
 import { quantile } from "d3-array";
 
-// TODO: Move scaleToUnity to own function to copy ML as closely as possible
-// TODO: Should we convert to grayscale before calculating percentiles?
-
 const scaleToUnity = (imageArray: Uint8ClampedArray): Uint8ClampedArray => {
   // Find max value efficiently without using spread operator
   let maxValue = 0;
@@ -26,6 +23,19 @@ const scaleToUnity = (imageArray: Uint8ClampedArray): Uint8ClampedArray => {
   return scaledArray;
 };
 
+const convertToGrayscale = (imageArray: Uint8ClampedArray): number[] => {
+  const grayscale: number[] = [];
+  // Convert RGBA to grayscale using the standard formula: 0.299R + 0.587G + 0.114B
+  for (let i = 0; i < imageArray.length; i += 4) {
+    const r = imageArray[i];
+    const g = imageArray[i + 1];
+    const b = imageArray[i + 2];
+    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+    grayscale.push(gray);
+  }
+  return grayscale;
+};
+
 export const executePercentileClipping = (
   imageArray: Uint8ClampedArray,
   parameters: { lowerBound: number; upperBound: number }
@@ -33,38 +43,40 @@ export const executePercentileClipping = (
   // First scale to unity
   const scaledArray = scaleToUnity(imageArray);
 
-  // Extract RGB channels (skip alpha channel) and normalize to 0-1 range
-  const rgbChannels: number[] = [];
-  for (let i = 0; i < scaledArray.length; i += 4) {
-    rgbChannels.push(scaledArray[i] / 255); // R
-    rgbChannels.push(scaledArray[i + 1] / 255); // G
-    rgbChannels.push(scaledArray[i + 2] / 255); // B
-  }
+  // Convert to grayscale
+  const grayscale = convertToGrayscale(scaledArray);
 
-  // Calculate quantiles on normalized RGB channels
-  const lowerQuantile = quantile(rgbChannels, parameters.lowerBound / 100);
-  const upperQuantile = quantile(rgbChannels, parameters.upperBound / 100);
+  // Normalize to 0-1 range
+  const normalizedGrayscale = grayscale.map((v) => v / 255);
+
+  // Calculate quantiles on normalized grayscale values
+  const lowerQuantile = quantile(
+    normalizedGrayscale,
+    parameters.lowerBound / 100
+  );
+  const upperQuantile = quantile(
+    normalizedGrayscale,
+    parameters.upperBound / 100
+  );
 
   // Create a new array to store the clipped values
-  const clippedArray = new Uint8ClampedArray(scaledArray.length);
+  const clippedArray = new Uint8ClampedArray(imageArray.length);
 
-  // Apply clipping to each channel while preserving alpha
-  for (let i = 0; i < scaledArray.length; i += 4) {
-    // Normalize current pixel values
-    const r = scaledArray[i] / 255;
-    const g = scaledArray[i + 1] / 255;
-    const b = scaledArray[i + 2] / 255;
+  // Apply clipping to each pixel while preserving alpha
+  for (let i = 0; i < imageArray.length; i += 4) {
+    // Get grayscale value for this pixel
+    const grayIndex = i / 4;
+    const normalizedGray = normalizedGrayscale[grayIndex];
 
     // Apply clipping in normalized space
-    clippedArray[i] = Math.round(
-      Math.min(Math.max(r, lowerQuantile), upperQuantile) * 255
-    ); // R
-    clippedArray[i + 1] = Math.round(
-      Math.min(Math.max(g, lowerQuantile), upperQuantile) * 255
-    ); // G
-    clippedArray[i + 2] = Math.round(
-      Math.min(Math.max(b, lowerQuantile), upperQuantile) * 255
-    ); // B
+    const clippedGray = Math.round(
+      Math.min(Math.max(normalizedGray, lowerQuantile), upperQuantile) * 255
+    );
+
+    // Set RGB channels to the same clipped grayscale value
+    clippedArray[i] = clippedGray; // R
+    clippedArray[i + 1] = clippedGray; // G
+    clippedArray[i + 2] = clippedGray; // B
     clippedArray[i + 3] = scaledArray[i + 3]; // A
   }
 
