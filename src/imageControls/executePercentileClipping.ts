@@ -69,9 +69,17 @@ export const executePercentileClipping = (
     const normalizedGray = normalizedGrayscale[grayIndex];
 
     // Apply clipping in normalized space
-    const clippedGray = Math.round(
-      Math.min(Math.max(normalizedGray, lowerQuantile), upperQuantile) * 255
-    );
+    let clippedGray: number;
+    if (normalizedGray < lowerQuantile) {
+      clippedGray = 0; // Clip to black
+    } else if (normalizedGray > upperQuantile) {
+      clippedGray = 255; // Clip to white
+    } else {
+      // Scale the value between the percentiles to the full range
+      const range = upperQuantile - lowerQuantile;
+      const normalizedValue = (normalizedGray - lowerQuantile) / range;
+      clippedGray = Math.round(normalizedValue * 255);
+    }
 
     // Set RGB channels to the same clipped grayscale value
     clippedArray[i] = clippedGray; // R
