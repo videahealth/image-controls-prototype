@@ -4,6 +4,7 @@ import Slider from "@mui/material/Slider";
 import Button from "@mui/material/Button";
 import { quantile } from "d3-array";
 import { executePercentileClipping } from "./executePercentileClipping.ts";
+import { executeHistogramStretching } from "./executeHistogramStretching.ts";
 import { Histogram } from "./Histogram.tsx";
 
 // My attempt at histogram scaling (incomplete)
@@ -178,6 +179,12 @@ export const ImageControlsV5 = ({ image, name }) => {
   const [upperBound, setUpperBound] = useState(100);
   const [originalImageData, setOriginalImageData] = useState(null);
   const [clippedImageData, setClippedImageData] = useState(null);
+  const [stretchedImageData, setStretchedImageData] = useState(null);
+  const [visibleHistograms, setVisibleHistograms] = useState({
+    original: true,
+    clipped: true,
+    stretched: true,
+  });
 
   const drawOriginalImage = () => {
     const canvas = canvasRef.current;
@@ -188,6 +195,8 @@ export const ImageControlsV5 = ({ image, name }) => {
       // Store original image data
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
       setOriginalImageData(imageData.data);
+      setClippedImageData(imageData.data);
+      setStretchedImageData(imageData.data);
     };
   };
 
@@ -214,14 +223,15 @@ export const ImageControlsV5 = ({ image, name }) => {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       setLowerBound(newLowerBound);
       setUpperBound(newUpperBound);
-      console.log("updateImage", { newLowerBound, newUpperBound });
       const clippedData = executePercentileClipping(imageData.data, {
         lowerBound: newLowerBound,
         upperBound: newUpperBound,
       });
-      imageData.data.set(clippedData);
+      const stretchedData = executeHistogramStretching(clippedData);
+      imageData.data.set(stretchedData);
       ctx.putImageData(imageData, 0, 0);
       setClippedImageData(clippedData);
+      setStretchedImageData(stretchedData);
     }
   };
 
@@ -244,6 +254,8 @@ export const ImageControlsV5 = ({ image, name }) => {
     setSharpeningStrength(1);
     setLowerBound(0);
     setUpperBound(100);
+    setClippedImageData(originalImageData);
+    setStretchedImageData(originalImageData);
     drawOriginalImage();
   };
 
@@ -413,20 +425,61 @@ export const ImageControlsV5 = ({ image, name }) => {
 
       {originalImageData && (
         <div style={{ width: "100%" }}>
-          {/* <Histogram
-            imageData={originalImageData}
-            title="Original Image Histogram"
-          /> */}
           <Histogram
-            imageData={clippedImageData ?? originalImageData}
-            title="Clipped Image Histogram"
+            imageData={
+              visibleHistograms.stretched ? stretchedImageData : undefined
+            }
+            title="Image Processing Pipeline"
+            originalImageData={
+              visibleHistograms.original ? originalImageData : undefined
+            }
+            clippedImageData={
+              visibleHistograms.clipped ? clippedImageData : undefined
+            }
           />
-          <div>
-            <p>Lower Bound: {lowerBound}</p>
-            <p>Upper Bound: {upperBound}</p>
-          </div>
         </div>
       )}
+      <div style={{ display: "flex", gap: "1em" }}>
+        <label>
+          <input
+            type="checkbox"
+            checked={visibleHistograms.original}
+            onChange={() =>
+              setVisibleHistograms({
+                ...visibleHistograms,
+                original: !visibleHistograms.original,
+              })
+            }
+          />
+          Original
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={visibleHistograms.clipped}
+            onChange={() =>
+              setVisibleHistograms({
+                ...visibleHistograms,
+                clipped: !visibleHistograms.clipped,
+              })
+            }
+          />
+          Clipped
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={visibleHistograms.stretched}
+            onChange={() =>
+              setVisibleHistograms({
+                ...visibleHistograms,
+                stretched: !visibleHistograms.stretched,
+              })
+            }
+          />
+          Stretched
+        </label>
+      </div>
     </div>
   );
 };
