@@ -68,6 +68,8 @@ const getSharpening = (name, cv, sigma, sharpeningStrength) => {
   sharpenDst.delete();
 };
 
+// TODO: Address PR feedback
+
 export const ImageControlsV5 = ({ image, name }) => {
   const { cv } = useOpenCv();
   const canvasRef = useRef();
@@ -115,13 +117,14 @@ export const ImageControlsV5 = ({ image, name }) => {
       context.drawImage(img, 0, 0, 750, 750);
 
       if (cv) {
+        getBrightnessContrast(name, cv, contrast, brightness);
+        getGamma(name, cv, gamma);
+        getSharpening(name, cv, blur, sharpeningStrength);
+
         const canvas = document.getElementById(name);
         const ctx = canvas.getContext("2d");
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-        getBrightnessContrast(name, cv, contrast, brightness);
-        getGamma(name, cv, gamma);
-        getSharpening(name, cv, blur, sharpeningStrength);
         setLowerBound(newLowerBound);
         setUpperBound(newUpperBound);
         const clippedData = executePercentileClipping(imageData.data, {
