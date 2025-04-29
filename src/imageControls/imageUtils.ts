@@ -1,3 +1,12 @@
+/**
+ * Scaling to unity is important because it normalizes the image data to a
+ * consistent range (0-1) regardless of the original bit depth (8-bit, 12-bit,
+ * or 16-bit). This ensures consistent behavior across different types of
+ * medical images.
+ *
+ * @param imageArray - The image data as a Uint8ClampedArray
+ * @returns A new Uint8ClampedArray with the scaled image data
+ */
 export const scaleToUnity = (
   imageArray: Uint8ClampedArray
 ): Uint8ClampedArray => {

@@ -1,5 +1,15 @@
 import { convertToGrayscale } from "./imageUtils.ts";
 
+/**
+ * Histogram stretching is a technique used to adjust the contrast of an image
+ * by stretching the pixels to the full range of 0-255. Any pixels that were
+ * clipped to the lower or upper bound in the previous step will be stretched to
+ * the extreme values of 0 (pure black) and 255 (pure white), respectively. The
+ * middle pixels will be stretched across the rest of the range.
+ *
+ * @param clippedArray - The image data as a Uint8ClampedArray
+ * @returns A new Uint8ClampedArray with the stretched image data
+ */
 export const executeHistogramStretching = (
   clippedArray: Uint8ClampedArray
 ): Uint8ClampedArray => {

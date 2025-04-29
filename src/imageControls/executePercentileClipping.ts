@@ -1,6 +1,23 @@
 import { quantile } from "d3-array";
 import { scaleToUnity, convertToGrayscale } from "./imageUtils.ts";
 
+/**
+ * Percentile clipping is a technique used to adjust the contrast of an image by
+ * clipping the darkest and brightest pixels to specific percentiles to improve
+ * the visibility of subtle details.
+ *
+ * In our case, the user can choose to clip up to the 5th percentile, removing
+ * the darkest 5% of pixels, and down to the 95th percentile, removing the
+ * brightest 5% of pixels. All of the pixels outside of these bounds are clipped
+ * to the nearest bound. Therefore, the range of the image is reduced.
+ *
+ * In the subsequent histogram stretching step, the image will be stretched back
+ * to the full range of 0-255.
+ *
+ * @param imageArray - The image data as a Uint8ClampedArray
+ * @param parameters - An object containing the lower and upper bounds for clipping
+ * @returns A new Uint8ClampedArray with the clipped image data
+ */
 export const executePercentileClipping = (
   imageArray: Uint8ClampedArray,
   parameters: { lowerBound: number; upperBound: number }
