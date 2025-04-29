@@ -2,108 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import { useOpenCv } from "opencv-react";
 import Slider from "@mui/material/Slider";
 import Button from "@mui/material/Button";
-import { quantile } from "d3-array";
 import { executePercentileClipping } from "./executePercentileClipping.ts";
 import { executeHistogramStretching } from "./executeHistogramStretching.ts";
 import { Histogram } from "./Histogram.tsx";
-
-// My attempt at histogram scaling (incomplete)
-/*const createHistogram = (data, numBins, min, max) => {
-    const histogram = [];
-    const binSize = (max - min) / numBins;
-
-    for (let i = 0; i < numBins; i += 1) {
-        histogram.push([]);
-    }
-
-    for (let i = 0; i < data.length; i += 1) {
-        if (data[i] < min || data[i] > max || i % 4 === 0) {
-            continue;
-        }
-        const binNumber = Math.floor((data[i] - min) / binSize);
-        histogram[binNumber].push(data[i]);
-    }
-
-    return histogram;
-}
-
-const getHistogramBin = (histogram, ignoredHistogram) => {
-    const histogramSum = histogram.reduce((sum, bin) => sum + bin.reduce((sum, pixel) => sum + pixel, 0), 0);
-    const ignoredHistogramSum = histogramSum * ignoredHistogram;
-
-    let cumulativeSum = 0;
-
-    return histogram.findIndex(bin => {
-        cumulativeSum += bin.reduce((sum, pixel) => sum + pixel, 0);
-        return cumulativeSum >= ignoredHistogramSum;
-    });
-}
-
-const histogramScaling = (name, cv, ignoredIntensity = 0.02, ignoredHistogram = 0.005) => {
-    let src = cv.imread(name);
-    const data = src.data;
-    
-    const maxBit = 255;
-    const ignoreBelow = Math.round(maxBit * ignoredIntensity);
-    const ignoreAbove = Math.round(maxBit - ignoreBelow);
-    const histogram = createHistogram(data, ignoreAbove - ignoreBelow + 1, ignoreBelow, ignoreAbove);
-    
-    const lowerHistogramBin = getHistogramBin(histogram, ignoredHistogram);
-    const upperHistogramBin = getHistogramBin(histogram, 1 - ignoredHistogram);
-
-    const currentLowerIntensity = ignoreBelow + lowerHistogramBin;
-    const currentUpperIntensity = ignoreBelow + upperHistogramBin;
-
-    const targetLowerIntensity = 0;
-    const targetUpperIntensity = maxBit;
-
-    const scaleFactor = targetUpperIntensity / (currentUpperIntensity + (targetLowerIntensity - currentLowerIntensity));
-    
-
-    for (let i = 0; i < data.length; i += 4) {
-        data[i] = Math.min(Math.max(data[i] * scaleFactor, 0), maxBit);
-        data[i + 1] = Math.min(Math.max(data[i + 1] * scaleFactor, 0), maxBit);
-        data[i + 2] = Math.min(Math.max(data[i + 2] * scaleFactor, 0), maxBit);
-    }
-
-    cv.imshow(name, src);
-    src.delete();
-}*/
-
-const histogramClipping = (data, clipLimit) => {
-  const lowerClipLimit = quantile(
-    data.filter((_, i) => i % 4 !== 0),
-    clipLimit[0] * 0.01
-  );
-  const upperClipLimit = quantile(
-    data.filter((_, i) => i % 4 !== 0),
-    clipLimit[1] * 0.01
-  );
-
-  const clippedValue = (data) => {
-    if (data < lowerClipLimit) {
-      return lowerClipLimit;
-    }
-    if (data > upperClipLimit) {
-      return upperClipLimit;
-    }
-    return data;
-  };
-
-  for (let i = 0; i < data.length; i += 4) {
-    data[i] = clippedValue(data[i]);
-    data[i + 1] = clippedValue(data[i + 1]);
-    data[i + 2] = clippedValue(data[i + 2]);
-  }
-};
-
-const getPreProcessing = (name, cv) => {
-  let src = cv.imread(name);
-  const data = src.data;
-  // histogramClipping(data, [0.01, 99.9]);
-  cv.imshow(name, src);
-  src.delete();
-};
 
 const getBrightnessContrast = (name, cv, alpha, beta) => {
   let src = cv.imread(name);
@@ -168,8 +69,10 @@ const getSharpening = (name, cv, sigma, sharpeningStrength) => {
 };
 
 export const ImageControlsV5 = ({ image, name }) => {
+  const { cv } = useOpenCv();
   const canvasRef = useRef();
   const img = new Image();
+
   const [gamma, setGamma] = useState(1);
   const [brightness, setBrightness] = useState(0);
   const [contrast, setContrast] = useState(1);
@@ -200,49 +103,37 @@ export const ImageControlsV5 = ({ image, name }) => {
     };
   };
 
-  useEffect(() => {
-    drawOriginalImage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const { cv } = useOpenCv();
-
-  const updateImage = ({
+  const handleUpdateImage = ({
     lowerBound: newLowerBound,
     upperBound: newUpperBound,
   }) => {
-    if (cv) {
-      getPreProcessing(name, cv);
-      getBrightnessContrast(name, cv, contrast, brightness);
-      getGamma(name, cv, gamma);
-      getSharpening(name, cv, blur, sharpeningStrength);
-
-      // Apply percentile clipping
-      const canvas = document.getElementById(name);
-      const ctx = canvas.getContext("2d");
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      setLowerBound(newLowerBound);
-      setUpperBound(newUpperBound);
-      const clippedData = executePercentileClipping(imageData.data, {
-        lowerBound: newLowerBound,
-        upperBound: newUpperBound,
-      });
-      const stretchedData = executeHistogramStretching(clippedData);
-      imageData.data.set(stretchedData);
-      ctx.putImageData(imageData, 0, 0);
-      setClippedImageData(clippedData);
-      setStretchedImageData(stretchedData);
-    }
-  };
-
-  // TODO: Combine handleUpdateImage and updateImage
-  const handleUpdateImage = (params) => {
     const canvas = canvasRef.current;
     const context = canvas.getContext("2d");
     img.src = image;
     img.onload = () => {
       context.drawImage(img, 0, 0, 750, 750);
-      updateImage(params);
+
+      if (cv) {
+        const canvas = document.getElementById(name);
+        const ctx = canvas.getContext("2d");
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        getBrightnessContrast(name, cv, contrast, brightness);
+        getGamma(name, cv, gamma);
+        getSharpening(name, cv, blur, sharpeningStrength);
+        setLowerBound(newLowerBound);
+        setUpperBound(newUpperBound);
+        const clippedData = executePercentileClipping(imageData.data, {
+          lowerBound: newLowerBound,
+          upperBound: newUpperBound,
+        });
+        const stretchedData = executeHistogramStretching(clippedData);
+        setClippedImageData(clippedData);
+        setStretchedImageData(stretchedData);
+
+        imageData.data.set(stretchedData);
+        ctx.putImageData(imageData, 0, 0);
+      }
     };
   };
 
@@ -258,6 +149,11 @@ export const ImageControlsV5 = ({ image, name }) => {
     setStretchedImageData(originalImageData);
     drawOriginalImage();
   };
+
+  useEffect(() => {
+    drawOriginalImage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
@@ -397,8 +293,6 @@ export const ImageControlsV5 = ({ image, name }) => {
               value={upperBound}
               step={0.1}
               onChange={(e) => {
-                // TODO: updateImage is firing with old state values
-                // setUpperBound(e.target.value);
                 handleUpdateImage({
                   lowerBound,
                   upperBound: e.target.value,
