@@ -83,6 +83,7 @@ export const ImageControlsV5 = ({ image, name }) => {
   const [originalImageData, setOriginalImageData] = useState(null);
   const [clippedImageData, setClippedImageData] = useState(null);
   const [stretchedImageData, setStretchedImageData] = useState(null);
+  const [isDevMode, setIsDevMode] = useState(false);
   const [visibleHistograms, setVisibleHistograms] = useState({
     original: true,
     clipped: true,
@@ -306,6 +307,14 @@ export const ImageControlsV5 = ({ image, name }) => {
               Reset Image
             </Button>
           </div>
+          <label>
+            <input
+              type="checkbox"
+              checked={isDevMode}
+              onChange={() => setIsDevMode(!isDevMode)}
+            />
+            Dev Mode
+          </label>
         </div>
 
         <canvas
@@ -317,63 +326,67 @@ export const ImageControlsV5 = ({ image, name }) => {
         />
       </div>
 
-      {originalImageData && (
-        <div style={{ width: "100%" }}>
-          <Histogram
-            imageData={
-              visibleHistograms.stretched ? stretchedImageData : undefined
-            }
-            title="Image Processing Pipeline"
-            originalImageData={
-              visibleHistograms.original ? originalImageData : undefined
-            }
-            clippedImageData={
-              visibleHistograms.clipped ? clippedImageData : undefined
-            }
-          />
-        </div>
+      {isDevMode && (
+        <>
+          {originalImageData && (
+            <div style={{ width: "100%" }}>
+              <Histogram
+                imageData={
+                  visibleHistograms.stretched ? stretchedImageData : undefined
+                }
+                title="Image Processing Pipeline"
+                originalImageData={
+                  visibleHistograms.original ? originalImageData : undefined
+                }
+                clippedImageData={
+                  visibleHistograms.clipped ? clippedImageData : undefined
+                }
+              />
+            </div>
+          )}
+          <div style={{ display: "flex", gap: "1em" }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={visibleHistograms.original}
+                onChange={() =>
+                  setVisibleHistograms({
+                    ...visibleHistograms,
+                    original: !visibleHistograms.original,
+                  })
+                }
+              />
+              Original
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={visibleHistograms.clipped}
+                onChange={() =>
+                  setVisibleHistograms({
+                    ...visibleHistograms,
+                    clipped: !visibleHistograms.clipped,
+                  })
+                }
+              />
+              Clipped
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={visibleHistograms.stretched}
+                onChange={() =>
+                  setVisibleHistograms({
+                    ...visibleHistograms,
+                    stretched: !visibleHistograms.stretched,
+                  })
+                }
+              />
+              Stretched
+            </label>
+          </div>
+        </>
       )}
-      <div style={{ display: "flex", gap: "1em" }}>
-        <label>
-          <input
-            type="checkbox"
-            checked={visibleHistograms.original}
-            onChange={() =>
-              setVisibleHistograms({
-                ...visibleHistograms,
-                original: !visibleHistograms.original,
-              })
-            }
-          />
-          Original
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={visibleHistograms.clipped}
-            onChange={() =>
-              setVisibleHistograms({
-                ...visibleHistograms,
-                clipped: !visibleHistograms.clipped,
-              })
-            }
-          />
-          Clipped
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={visibleHistograms.stretched}
-            onChange={() =>
-              setVisibleHistograms({
-                ...visibleHistograms,
-                stretched: !visibleHistograms.stretched,
-              })
-            }
-          />
-          Stretched
-        </label>
-      </div>
     </div>
   );
 };
