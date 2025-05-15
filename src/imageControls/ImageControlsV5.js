@@ -68,8 +68,6 @@ const getSharpening = (name, cv, sigma, sharpeningStrength) => {
   sharpenDst.delete();
 };
 
-// TODO: Address PR feedback
-
 export const ImageControlsV5 = ({ image, name }) => {
   const { cv } = useOpenCv();
   const canvasRef = useRef();
@@ -117,10 +115,6 @@ export const ImageControlsV5 = ({ image, name }) => {
       context.drawImage(img, 0, 0, 750, 750);
 
       if (cv) {
-        getBrightnessContrast(name, cv, contrast, brightness);
-        getGamma(name, cv, gamma);
-        getSharpening(name, cv, blur, sharpeningStrength);
-
         const canvas = document.getElementById(name);
         const ctx = canvas.getContext("2d");
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -135,8 +129,14 @@ export const ImageControlsV5 = ({ image, name }) => {
         setClippedImageData(clippedData);
         setStretchedImageData(stretchedData);
 
+        // Apply the clipped and stretched data to the canvas
         imageData.data.set(stretchedData);
         ctx.putImageData(imageData, 0, 0);
+
+        // Then apply other image processing operations
+        getBrightnessContrast(name, cv, contrast, brightness);
+        getGamma(name, cv, gamma);
+        getSharpening(name, cv, blur, sharpeningStrength);
       }
     };
   };
@@ -189,7 +189,10 @@ export const ImageControlsV5 = ({ image, name }) => {
           }}
         >
           <div style={{ display: "flex", gap: "1em", width: "20em" }}>
-            <label>Gamma:</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label>Gamma:</label>
+              <span>{gamma}</span>
+            </div>
             <Slider
               min={0}
               max={10}
@@ -206,7 +209,10 @@ export const ImageControlsV5 = ({ image, name }) => {
             />
           </div>
           <div style={{ display: "flex", gap: "1em", width: "20em" }}>
-            <label>Brightness:</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label>Brightness:</label>
+              <span>{brightness}</span>
+            </div>
             <Slider
               min={-100}
               max={100}
@@ -222,7 +228,10 @@ export const ImageControlsV5 = ({ image, name }) => {
             />
           </div>
           <div style={{ display: "flex", gap: "1em", width: "20em" }}>
-            <label>Contrast:</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label>Contrast:</label>
+              <span>{contrast}</span>
+            </div>
             <Slider
               min={0}
               max={2}
@@ -239,7 +248,10 @@ export const ImageControlsV5 = ({ image, name }) => {
             />
           </div>
           <div style={{ display: "flex", gap: "1em", width: "20em" }}>
-            <label>Sharpening Kernel Size:</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label>Sharpening Kernel Size:</label>
+              <span>{blur}</span>
+            </div>
             <Slider
               min={1}
               max={20}
@@ -256,7 +268,10 @@ export const ImageControlsV5 = ({ image, name }) => {
             />
           </div>
           <div style={{ display: "flex", gap: "1em", width: "20em" }}>
-            <label>Sharpen Strength:</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label>Sharpen Strength:</label>
+              <span>{sharpeningStrength}</span>
+            </div>
             <Slider
               min={1}
               max={10}
@@ -273,7 +288,10 @@ export const ImageControlsV5 = ({ image, name }) => {
             />
           </div>
           <div style={{ display: "flex", gap: "1em", width: "20em" }}>
-            <label>Lower Bound (%):</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label>Lower Bound:</label>
+              <span>{lowerBound}%</span>
+            </div>
             <Slider
               min={0}
               max={5}
@@ -290,7 +308,10 @@ export const ImageControlsV5 = ({ image, name }) => {
             />
           </div>
           <div style={{ display: "flex", gap: "1em", width: "20em" }}>
-            <label>Upper Bound (%):</label>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <label>Upper Bound:</label>
+              <span>{upperBound}%</span>
+            </div>
             <Slider
               min={95}
               max={100}
